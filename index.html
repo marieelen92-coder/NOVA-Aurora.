@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Living in Space: Hábitat Futurista</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- ==================================================================== -->
+    <!-- =========================== PARTE 1: CSS STYLES ========================== -->
+    <!-- ==================================================================== -->
+    <style>
+        /* Definición de fuentes */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap');
+        
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+
+        /* Variables de Color (para Dashboard y Three.js glow) */
+        :root {
+          --color-cyan: #06b6d4;
+          --color-blue: #3b82f6;
+          --color-yellow: #facc15;
+          --color-purple: #9333ea;
+          --color-red: #ef4444;
+          --star-color: rgba(255, 255, 255, 0.8);
+          --nebula-color: #00ffff;
+        }
+
+        /* Fondo espacial animado (CSS PURE) */
+        .space-background {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: #000;
+          background-image:
+            radial-gradient(1px 1px at 50% 50%, var(--star-color), rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 10% 90%, var(--nebula-color), rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 90% 10%, var(--nebula-color), rgba(0,0,0,0));
+          background-size: 5000px 5000px, 3000px 3000px, 4000px 4000px;
+          animation: background-move 120s linear infinite;
+          opacity: 0.8;
+          z-index: -10;
+        }
+
+        @keyframes background-move {
+          0% { background-position: 0 0, 0 0, 0 0; }
+          100% { background-position: 5000px 5000px, -3000px 3000px, 4000px -4000px; }
+        }
+
+        /* Efecto Holograma/Glow para títulos */
+        .hologram-effect {
+            text-shadow: 0 0 5px var(--color-cyan), 0 0 10px var(--color-cyan);
+            animation: pulse 5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Estilo para Three.js canvas */
+        #habitat-canvas {
+            min-height: 50vh;
+            display: block;
+            width: 100%;
+        }
+
+        /* Estilos de transición para el panel lateral */
+        .module-panel {
+            transition: transform 0.5s ease-in-out;
+        }
+
+        /* Dark Mode overrides (handled mostly by JS/Tailwind classes but setting defaults) */
+        body {
+            background-color: #111827; /* bg-gray-900 */
+            color: white;
+        }
+    </style>
+    <!-- ==================================================================== -->
+    <!-- ========================= FIN PARTE 1: CSS STYLES ======================== -->
+    <!-- ==================================================================== -->
+
+</head>
+<body>
+
+    <!-- ==================================================================== -->
+    <!-- ======================== PARTE 2: HTML STRUCTURE ======================= -->
+    <!-- ==================================================================== -->
+    
+    <div id="app" class="min-h-screen relative">
+
+        <!-- Fondo espacial -->
+        <div class="space-background"></div>
+
+        <!-- Botón de Modo Oscuro/Claro -->
+        <button id="toggle-dark-mode" class="fixed top-4 right-4 z-50 p-2 rounded-full text-2xl transition bg-gray-800 hover:bg-gray-700 text-cyan-400 hover:scale-110 shadow-lg" aria-label="Toggle Dark/Light Mode">
+            🌞
+        </button>
+
+        <!-- 1. Hero Section -->
+        <section class="h-screen flex flex-col items-center justify-center text-center p-6 relative z-10">
+            <h1 class="text-6xl md:text-8xl font-orbitron font-bold mb-4 text-cyan-400 tracking-tight hologram-effect">
+                Hogares en el Espacio
+            </h1>
+            <h2 class="text-2xl md:text-4xl font-light mb-6 text-white">
+                Viviendo más allá de la Tierra
+            </h2>
+            <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 text-white opacity-90">
+                Explora cómo la NASA diseña hábitats que mantienen a la tripulación sana, segura y lista para la misión.
+            </p>
+            <button id="scroll-to-habitat" class="py-3 px-8 text-xl rounded-full uppercase font-semibold transition transform hover:scale-105 bg-cyan-600 hover:bg-cyan-500 text-white shadow-xl shadow-cyan-500/50 border border-cyan-400/50">
+                Explorar el Hábitat
+            </button>
+        </section>
+
+        <!-- 2. Interactive 3D Habitat Map -->
+        <section id="habitat" class="py-16 md:py-24 p-6 relative z-10">
+            <h2 class="text-4xl md:text-5xl font-orbitron font-bold text-center mb-10 text-cyan-400 hologram-effect">
+                Mapa Interactivo del Hábitat
+            </h2>
+            <p class="text-center text-xl max-w-3xl mx-auto mb-12 opacity-80">
+                Haz clic o toca un módulo para ver cómo contribuye al bienestar de la tripulación.
+            </p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+                <!-- Columna de Botones (Renderizada por JS) -->
+                <div id="module-buttons" class="lg:col-span-1 flex flex-wrap lg:flex-col gap-4 lg:gap-3 justify-center lg:justify-start">
+                    <!-- Botones de Módulos van aquí -->
+                </div>
+
+                <!-- Columna de Visualización 3D -->
+                <div id="habitat-canvas-container" class="lg:col-span-3 h-[60vh] md:h-[70vh] rounded-xl overflow-hidden border border-cyan-500/30 shadow-2xl shadow-cyan-500/50 relative">
+                    <!-- El canvas de Three.js se inyecta aquí -->
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. Panel de Bienestar de la Tripulación (Renderizado por JS) -->
+        <section class="py-16 md:py-24 p-6 relative z-10">
+            <div id="wellness-dashboard">
+                <!-- Dashboard va aquí -->
+            </div>
+        </section>
+
+        <!-- 4. Sección Educativa “Por qué es importante” (Renderizada por JS) -->
+        <section class="py-16 md:py-24 p-6 relative z-10">
+            <h2 class="text-4xl md:text-5xl font-orbitron font-bold text-center mb-10 text-cyan-400 hologram-effect">
+              Tecnología Clave
+            </h2>
+            <div id="educational-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+                <!-- Tarjetas educativas van aquí -->
+            </div>
+        </section>
+
+        <!-- 5. Footer -->
+        <footer class="py-12 p-6 text-center border-t border-cyan-500/30 relative overflow-hidden bg-gray-800/70 backdrop-blur-sm">
+            <!-- Animación de planeta en órbita (fondo suave) -->
+            <div class="absolute inset-0 z-0 opacity-20">
+                <div class="w-40 h-40 bg-orange-800 rounded-full blur-xl absolute -bottom-10 -left-10 animate-[spin_60s_linear_infinite]"></div>
+                <div class="w-20 h-20 bg-cyan-800 rounded-full blur-lg absolute -top-5 -right-5 animate-[pulse_10s_ease-in-out_infinite]"></div>
+            </div>
+            <div class="relative z-10">
+                <p class="text-xl font-bold mb-3">
+                  Creado para el <span class="text-cyan-400">NASA Space Apps Challenge</span> – Proyecto Techno Titans
+                </p>
+                <p class="text-sm opacity-70 mb-6">Inspirando a la próxima generación de exploradores.</p>
+                <div class="flex justify-center space-x-6 text-2xl">
+                  <a href="https://github.com/nasa" target="_blank" rel="noopener noreferrer" class="hover:text-cyan-400 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 3c.48.97.48 2.41 0 3.37v.34l-1 .09c-2.84 0-5.17 2.37-5.17 5.27v.08a2.03 2.03 0 0 0 .58 1.48L11 17l.03-.01c.26-.06.52-.08.78-.08s.52.02.78.08l.03.01L14 17l.58-1.59a2.03 2.03 0 0 0 .58-1.48v-.08c0-2.9-2.33-5.27-5.17-5.27h-1l-1.09-.09v-.34c0-2.43 1.72-4.44 3.99-4.88A5.44 5.44 0 0 0 16 1.77a5.07 5.07 0 0 0 .91-1.77c-.48-.97-.48-2.41 0-3.37z"/></svg>
+                  </a>
+                  <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" class="hover:text-cyan-400 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 0-6 6v7H6v-7a6 6 0 0 1 12 0v7h-4V14a2 2 0 0 0-2-2H8V8h2a4 4 0 0 0 4 4h0a4 4 0 0 0 4-4z"/><circle cx="4" cy="4" r="2"/></svg>
+                  </a>
+                  <a href="https://www.nasa.gov" target="_blank" rel="noopener noreferrer" class="hover:text-orange-400 transition">
+                    <span class="font-orbitron font-bold">NASA</span>
+                  </a>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Panel lateral de información (Renderizado por JS) -->
+        <div id="module-panel" class="module-panel fixed top-0 right-0 h-full w-full md:w-96 p-6 z-50 translate-x-full bg-gray-800/70 backdrop-blur-sm border-l border-cyan-500/30 shadow-2xl shadow-cyan-500/50 overflow-y-auto">
+            <!-- Contenido del módulo seleccionado va aquí -->
+        </div>
+
+    </div>
+
+    <!-- ==================================================================== -->
+    <!-- ======================= FIN PARTE 2: HTML STRUCTURE ====================== -->
+    <!-- ==================================================================== -->
+
+
+    <!-- ==================================================================== -->
+    <!-- ========================= PARTE 3: JAVASCRIPT LOGIC ======================== -->
+    <!-- ==================================================================== -->
+    <script>
+        // --- JAVASCRIPT: Lógica, Datos y Three.js ---
+
+        // --- Estado de la Aplicación ---
+        let selectedModuleId = null;
+        let exploredModules = new Set();
+        let isDarkMode = true;
+
+        // --- Datos y Contenido ---
+        
+        // ===================================================================================
+        // === AQUÍ ES DONDE TUS COMPAÑEROS DEBEN PEGAR LAS IMÁGENES Y AÑADIR MÁS DETALLES ===
+        // ===================================================================================
+        const MODULES_DATA = [
+          { 
+            id: 'lifeSupport', 
+            icon: '🌱', 
+            name: 'Soporte Vital', 
+            description: 'El sistema ECLSS (Control Ambiental) regula la atmósfera, recicla agua y genera oxígeno puro, esencial para la supervivencia en misiones de larga duración. Reciclaje del 93% del agua.', 
+            longDescription: 'El subsistema de purificación de agua utiliza destilación y catálisis. El aire es filtrado para remover dióxido de carbono y contaminantes, manteniendo un ambiente respirable y seguro a largo plazo.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x00ffff, 
+            link: 'https://www.nasa.gov/general/environmental-control-and-life-support-system-eclss/',
+            imageUrl: 'https://thoughtful-purple-qp677yk8ow.edgeone.app/Vital%20-%20watermark%20AI.png' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          { 
+            id: 'wasteMgmt', 
+            icon: '♻️', 
+            name: 'Gestión de Residuos', 
+            description: 'Los residuos son compactados y procesados. Conceptos como "Trash-to-Gas" buscan convertir los desechos orgánicos en recursos útiles, cerrando el ciclo de vida en el hábitat.', 
+            longDescription: 'La incineración o gasificación de residuos puede generar energía y, lo más importante, recuperar agua, que es un recurso crítico. El reciclaje debe ser eficiente debido a las limitaciones de volumen.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x00ff00, 
+            link: 'https://www.nasa.gov/general/trash-to-gas-technology-for-space-exploration/',
+            imageUrl: 'https://web.whatsapp.com/4e1191bf-6f76-4d17-9e55-8922ddd066d0' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          { 
+            id: 'thermalCtrl', 
+            icon: '❄️', 
+            name: 'Control Térmico', 
+            description: 'Utiliza radiadores y loops de refrigeración para disipar el calor generado por la electrónica y los astronautas, manteniendo la temperatura interna estable y habitable.', 
+            longDescription: 'El lado del hábitat que mira al sol se calienta mucho, mientras que el lado opuesto es extremadamente frío. Los sistemas térmicos deben equilibrar estas fluctuaciones extremas de temperatura.', // NUEVA INFORMACIÓN EXTRA
+            color: 0xffa500, 
+            link: 'https://www.nasa.gov/mission/international-space-station/research-and-technology/thermal-control/',
+            imageUrl: 'https://placehold.co/400x200/ffa500/000000?text=Imagen+de+Control+Térmico' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          { 
+            id: 'galley', 
+            icon: '🍲', 
+            name: 'Alimentos y Galley', 
+            description: 'La cocina espacial (Galley) almacena y prepara alimentos liofilizados, nutricionalmente balanceados. La clave es la variedad y el aporte calórico adecuado para el trabajo.', 
+            longDescription: 'Los alimentos deben tener una vida útil muy larga y ser fáciles de preparar, a menudo solo agregando agua. Los envases son diseñados para prevenir que la comida flote en microgravedad.', // NUEVA INFORMACIÓN EXTRA
+            color: 0xffff00, 
+            link: 'https://www.nasa.gov/general/food-in-space/',
+            imageUrl: 'https://ugly-peach-rwgl0utyqy.edgeone.app/AI%20image%20generated%20in%20Dall-E.png' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          { 
+            id: 'medicalBay', 
+            icon: '🏥', 
+            name: 'Enfermería', 
+            description: 'Un área dedicada al monitoreo de salud, telemedicina y el manejo de emergencias médicas. Es vital para asegurar que la tripulación permanezca en óptimas condiciones.', 
+            longDescription: 'En misiones profundas, el tiempo de comunicación con la Tierra es demasiado largo. La tripulación debe ser capaz de realizar diagnósticos y procedimientos quirúrgicos de emergencia por sí misma.', // NUEVA INFORMACIÓN EXTRA
+            color: 0xff0000, 
+            link: 'https://www.nasa.gov/missions/artemis/human-health/',
+            imageUrl: 'https://many-plum-0fqt3aocrk.edgeone.app/Medical%202%20(Watermark).png' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          { 
+            id: 'sleep', 
+            icon: '🛏️', 
+            name: 'Cabinas de Descanso', 
+            description: 'Módulos de sueño privados, diseñados para minimizar el ruido y controlar la luz, permitiendo un descanso de calidad esencial para la función cognitiva y el bienestar emocional.', 
+            longDescription: 'Los astronautas duermen en sacos de dormir fijados a la pared para evitar flotar. El ruido de las bombas y ventiladores debe ser mitigado para garantizar 8 horas de sueño efectivas.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x0000ff, 
+            link: 'https://www.nasa.gov/general/sleeping-in-space/',
+            imageUrl: 'https://okay-amber-pnmltl3lbc.edgeone.app/AI%20image%20generated%20in%20Dall-E%20(1).png' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          { 
+            id: 'exercise', 
+            icon: '🏋️', 
+            name: 'Gimnasio', 
+            description: 'Máquinas especializadas (ARED, CEVIS, T2) combaten la pérdida de masa muscular y ósea causada por la microgravedad, asegurando que los astronautas puedan regresar a la Tierra sanos.', 
+            longDescription: 'La máquina ARED (Advanced Resistive Exercise Device) permite levantar peso en microgravedad, simulando la carga de la gravedad terrestre para los ejercicios de fuerza.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x8a2be2, 
+            link: 'https://www.nasa.gov/missions/station/research-and-technology/exercise/',
+            imageUrl: 'https://anxious-fuchsia-lix6mnjeru.edgeone.app/Exercise%20image%202.png' // PEGAR URL DE IMAGEN AQUÍ
+          },
+        ];
+        // ===================================================================================
+        // === FIN DE LA SECCIÓN DE EDICIÓN DE IMÁGENES Y DETALLES ===========================
+        // ===================================================================================
+
+        const EDUCATIONAL_CARDS = [
+            { title: 'Recuperación de Agua', text: 'La ISS recicla hasta el 98% del agua total de la estación (incluyendo sudor, humedad y orina).', nasaLink: 'https://www.nasa.gov/missions/station/research-and-technology/water-recovery/' },
+            { title: 'Sistemas ECLSS', text: 'El sistema ECLSS es crucial, utilizando electrólisis para separar el agua en oxígeno respirable y hidrógeno.', nasaLink: 'https://www.nasa.gov/general/environmental-control-and-life-support-system-eclss/' },
+            { title: 'Ejercicio Obligatorio', text: 'Los astronautas deben realizar hasta 2.5 horas de ejercicio diario para contrarrestar la atrofia muscular y la desmineralización ósea.', nasaLink: 'https://www.nasa.gov/missions/station/research-and-technology/exercise/' },
+            { title: 'Bienestar Mental', text: 'El diseño interior busca minimizar la sensación de aislamiento: uso de colores cálidos, ventanas y áreas de recreación social.', nasaLink: 'https://www.nasa.gov/general/human-health-and-performance/' },
+        ];
+
+        const WELLNESS_DATA = [
+            { label: 'Oxígeno', value: 98, color: 'cyan' },
+            { label: 'Agua', value: 93, color: 'blue' },
+            { label: 'Nutrientes', value: 85, color: 'yellow' },
+            { label: 'Sueño (Hrs)', value: 8, color: 'purple' },
+            { label: 'Ejercicio (%)', value: 100, color: 'red' },
+        ];
+
+        // --- Configuración de Tema (Vanilla JS version) ---
+        const getThemeClasses = (isDark) => isDark ? {
+            bg: 'bg-gray-900',
+            text: 'text-white',
+            accent: 'text-cyan-400',
+            primary: 'bg-cyan-600 hover:bg-cyan-500',
+            secondary: 'bg-gray-800 hover:bg-gray-700',
+            card: 'bg-gray-800/70 backdrop-blur-sm',
+            shadow: 'shadow-cyan-500/50',
+            border: 'border-cyan-500/20'
+        } : {
+            bg: 'bg-gray-100',
+            text: 'text-gray-900',
+            accent: 'text-orange-600',
+            primary: 'bg-orange-600 hover:bg-orange-500',
+            secondary: 'bg-white hover:bg-gray-200',
+            card: 'bg-white/90 backdrop-blur-sm',
+            shadow: 'shadow-orange-500/50',
+            border: 'border-orange-500/20'
+        };
+        
+        let theme = getThemeClasses(isDarkMode);
+
+        // --- Funciones de Renderizado DOM ---
+
+        function updateDOMTheme() {
+            theme = getThemeClasses(isDarkMode);
+            const body = document.body;
+            body.className = `font-inter ${theme.bg} ${theme.text}`;
+            
+            // Actualizar el botón de modo oscuro/claro
+            const toggleBtn = document.getElementById('toggle-dark-mode');
+            toggleBtn.className = `fixed top-4 right-4 z-50 p-2 rounded-full text-2xl transition ${theme.secondary} ${theme.accent} hover:scale-110 shadow-lg`;
+            toggleBtn.textContent = isDarkMode ? '🌞' : '🌑';
+            
+            // Vuelve a renderizar componentes dinámicos para aplicar las nuevas clases de tema
+            renderModuleButtons();
+            renderWellnessDashboard();
+            renderEducationalCards();
+            updateModulePanel();
+        }
+
+        function renderModuleButtons() {
+            const container = document.getElementById('module-buttons');
+            container.innerHTML = '';
+            const allExplored = exploredModules.size === MODULES_DATA.length;
+
+            MODULES_DATA.forEach(module => {
+                const isSelected = selectedModuleId === module.id;
+                const isExplored = exploredModules.has(module.id);
+
+                const button = document.createElement('button');
+                button.setAttribute('data-module-id', module.id);
+                button.className = `w-full py-3 px-4 rounded-lg text-left transition duration-300 transform
+                    ${isSelected ? `border-2 border-orange-400/80 ${theme.card} shadow-xl shadow-orange-500/30` : `border ${theme.border} ${theme.secondary} opacity-70 hover:opacity-100 hover:scale-[1.02]`}
+                    flex items-center space-x-3`;
+                button.innerHTML = `
+                    <span class="text-2xl">${module.icon}</span>
+                    <span class="font-semibold">${module.name}</span>
+                    ${isExplored ? '<span class="text-orange-400 ml-auto text-xl">✓</span>' : ''}
+                `;
+                button.onclick = () => handleModuleClick(module.id);
+                container.appendChild(button);
+            });
+
+            if (allExplored) {
+                const message = document.createElement('div');
+                message.className = 'w-full mt-6 p-4 text-center rounded-lg bg-green-900/50 border border-green-500 text-green-400 font-bold text-lg animate-pulse';
+                message.textContent = '¡Felicidades! ¡Sabes cómo sobrevivir!';
+                container.appendChild(message);
+            }
+        }
+
+        function renderWellnessDashboard() {
+            const container = document.getElementById('wellness-dashboard');
+            container.innerHTML = `
+                <h2 class="text-4xl md:text-5xl font-extrabold text-center mb-10 ${theme.accent}">
+                    Panel de Bienestar de la Tripulación
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-6">
+                    ${WELLNESS_DATA.map((item, index) => `
+                        <div class="${theme.card} p-4 rounded-lg border ${theme.border} shadow-lg transition hover:scale-[1.03] duration-300">
+                            <p class="text-lg font-light mb-2 ${theme.text}">${item.label}</p>
+                            <div class="h-4 bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                    class="h-full rounded-full transition-all duration-1000 ease-out"
+                                    style="width: ${item.value}%; background-color: var(--color-${item.color}); box-shadow: 0 0 10px var(--color-${item.color});"
+                                ></div>
+                            </div>
+                            <p class="text-3xl font-bold mt-2 ${theme.accent}">${item.value}${item.label.includes('Hrs') ? '' : '%'}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderEducationalCards() {
+            const container = document.getElementById('educational-cards-container');
+            container.innerHTML = EDUCATIONAL_CARDS.map((card, index) => `
+                <div class="${theme.card} p-6 rounded-xl border ${theme.border} shadow-xl transition-all duration-500 hover:scale-[1.05] hover:border-orange-400/50">
+                    <h3 class="text-2xl font-bold mb-3 ${theme.accent} font-orbitron">${card.title}</h3>
+                    <p class="mb-6 ${theme.text} opacity-80">${card.text}</p>
+                    <a
+                        href="${card.nasaLink}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-block py-2 px-4 rounded-md text-sm font-semibold transition ${theme.primary} text-white"
+                    >
+                        Ver más en NASA
+                    </a>
+                </div>
+            `).join('');
+        }
+
+        function updateModulePanel() {
+            const panel = document.getElementById('module-panel');
+            const selectedModule = MODULES_DATA.find(m => m.id === selectedModuleId);
+
+            if (selectedModule) {
+                panel.classList.remove('translate-x-full');
+                panel.classList.add('translate-x-0');
+                
+                panel.innerHTML = `
+                    <button
+                        onclick="handleModuleClick(null)"
+                        class="fixed top-4 right-4 p-2 rounded-full ${theme.secondary} text-xl ${theme.accent} hover:scale-110 transition z-50"
+                    >
+                        &times;
+                    </button>
+                    <div class="flex flex-col h-full pt-10">
+                      <p class="text-6xl mb-4">${selectedModule.icon}</p>
+                      <h2 class="text-4xl font-bold mb-4 ${theme.accent}">${selectedModule.name}</h2>
+                      
+                      <!-- Contenedor de la Imagen del Módulo -->
+                      ${selectedModule.imageUrl ? 
+                        `<img 
+                            src="${selectedModule.imageUrl}" 
+                            onerror="this.onerror=null;this.src='https://placehold.co/400x200/3b82f6/ffffff?text=Error+de+Carga';" 
+                            alt="Imagen de ${selectedModule.name}" 
+                            class="w-full h-auto rounded-lg mb-4 object-cover border border-white/20 shadow-lg"
+                        />` : ''}
+
+                      <p class="text-lg mb-4 ${theme.text} opacity-80">${selectedModule.description}</p>
+
+                      <!-- Campo de Información Adicional (Long Description) -->
+                      <div class="p-4 rounded-lg bg-gray-700/50 border border-cyan-400/30 mb-6 text-sm">
+                          <h3 class="font-bold text-cyan-400 mb-2 font-orbitron">Detalles Clave de la Tecnología:</h3>
+                          <p class="text-white opacity-90">${selectedModule.longDescription}</p>
+                      </div>
+
+                      <a
+                        href="${selectedModule.link}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="w-full text-center py-3 rounded-lg font-semibold uppercase tracking-wider transition ${theme.primary} text-white mt-auto shadow-md"
+                      >
+                        Ver más en NASA
+                      </a>
+                    </div>
+                `;
+            } else {
+                panel.classList.remove('translate-x-0');
+                panel.classList.add('translate-x-full');
+            }
+        }
+
+        // --- Manejadores de Eventos ---
+
+        function handleModuleClick(id) {
+            selectedModuleId = id;
+            if (id) {
+                exploredModules.add(id);
+                // Si la escena 3D está cargada, enfocar el módulo
+                if (window.animateThreeJS) {
+                    focusCameraOnModule(id);
+                }
+            } else {
+                // Volver a posición inicial de la cámara
+                if (window.animateThreeJS) {
+                    resetCameraPosition();
+                }
+            }
+            renderModuleButtons();
+            updateModulePanel();
+        }
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            updateDOMTheme();
+        }
+
+        function scrollToHabitat() {
+            document.getElementById('habitat').scrollIntoView({ behavior: 'smooth' });
+        }
+
+
+        // --- THREE.JS: Inicialización y Lógica 3D ---
+
+        let scene, camera, renderer, meshes = {};
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        const getModuleConfig = (id) => {
+            switch (id) {
+              case 'lifeSupport': return { position: new THREE.Vector3(0, 3, 0), geometry: new THREE.CylinderGeometry(0.8, 0.8, 1.5, 32), name: 'lifeSupport' };
+              case 'wasteMgmt': return { position: new THREE.Vector3(2.5, 0, 0), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'wasteMgmt' };
+              case 'thermalCtrl': return { position: new THREE.Vector3(-2.5, 0, 0), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'thermalCtrl' };
+              case 'galley': return { position: new THREE.Vector3(0, 0, 2.5), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'galley' };
+              case 'medicalBay': return { position: new THREE.Vector3(0, 0, -2.5), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'medicalBay' };
+              case 'sleep': return { position: new THREE.Vector3(1.5, 1.5, 1.5), geometry: new THREE.BoxGeometry(1, 1, 1), name: 'sleep' };
+              case 'exercise': return { position: new THREE.Vector3(-1.5, 1.5, -1.5), geometry: new THREE.BoxGeometry(1, 1, 1), name: 'exercise' };
+              default: return null;
+            }
+        };
+
+        function initThreeJS() {
+            const container = document.getElementById('habitat-canvas-container');
+            if (!container) return;
+
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.z = 10;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // alpha: true para fondo transparente
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            
+            const canvas = renderer.domElement;
+            canvas.id = 'habitat-canvas';
+            container.appendChild(canvas);
+
+            // Luces
+            scene.add(new THREE.AmbientLight(0x404040, 5));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 3);
+            dirLight.position.set(10, 10, 10);
+            scene.add(dirLight);
+
+            // Núcleo del Hábitat
+            const coreGeometry = new THREE.CylinderGeometry(1.5, 1.5, 5, 32);
+            const coreMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.4 });
+            const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial);
+            scene.add(coreMesh);
+
+            // Creación de Módulos
+            MODULES_DATA.forEach(moduleData => {
+              const config = getModuleConfig(moduleData.id);
+              const material = new THREE.MeshStandardMaterial({
+                color: moduleData.color,
+                emissive: moduleData.color,
+                emissiveIntensity: 0.2,
+                metalness: 0.9,
+                roughness: 0.2
+              });
+
+              const mesh = new THREE.Mesh(config.geometry, material);
+              mesh.position.copy(config.position);
+              mesh.userData.moduleData = moduleData;
+              meshes[moduleData.id] = mesh;
+              scene.add(mesh);
+            });
+
+            // Event Listeners para interacción 3D
+            canvas.addEventListener('pointerdown', onPointerDown, false);
+            container.addEventListener('mousemove', onMouseMove, false);
+            window.addEventListener('resize', onWindowResize, false);
+
+            animateThreeJS(); // Iniciar el bucle de animación
+        }
+        
+        // Exponer la función de animación para usarla en el onload (aunque ya está en initThreeJS)
+        window.animateThreeJS = function () {
+            requestAnimationFrame(window.animateThreeJS);
+
+            // Rotación suave
+            if (scene) {
+                scene.rotation.y += 0.001;
+            }
+            
+            // Renderizado
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        };
+
+
+        function onWindowResize() {
+            const container = document.getElementById('habitat-canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            if (camera && renderer) {
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            }
+        }
+
+        function onPointerDown(event) {
+            event.preventDefault();
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(Object.values(meshes));
+
+            if (intersects.length > 0) {
+                const selectedMesh = intersects[0].object;
+                const moduleData = selectedMesh.userData.moduleData;
+
+                if (moduleData) {
+                    handleModuleClick(moduleData.id); // Actualiza el estado y el panel
+                }
+            } else {
+                handleModuleClick(null); // Click fuera, cerrar panel
+            }
+        }
+        
+        function onMouseMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(Object.values(meshes));
+
+            let hoveredModule = null;
+
+            Object.values(meshes).forEach(mesh => {
+                const moduleData = mesh.userData.moduleData;
+                const isSelected = selectedModuleId === moduleData.id;
+
+                if (intersects.length > 0 && intersects[0].object === mesh) {
+                    // Objeto en hover: Aumentar glow
+                    mesh.material.emissiveIntensity = 1.0;
+                    hoveredModule = moduleData.id;
+                    document.body.style.cursor = 'pointer';
+                } else if (isSelected) {
+                    // Objeto seleccionado: mantener glow
+                    mesh.material.emissiveIntensity = 0.8;
+                } else {
+                    // Normal: glow base
+                    mesh.material.emissiveIntensity = 0.2;
+                }
+            });
+
+            if (!hoveredModule) {
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function focusCameraOnModule(id) {
+            const selectedMesh = meshes[id];
+            if (selectedMesh && camera) {
+                // Zoom y centrado de la cámara hacia el módulo
+                const targetPosition = selectedMesh.position.clone().multiplyScalar(1.5);
+                camera.position.set(targetPosition.x, targetPosition.y + 2, targetPosition.z + 5);
+                camera.lookAt(selectedMesh.position);
+            }
+        }
+
+        function resetCameraPosition() {
+            if (camera) {
+                const targetPosition = new THREE.Vector3(0, 0, 10);
+                camera.position.set(targetPosition.x, targetPosition.y, targetPosition.z);
+                camera.lookAt(new THREE.Vector3(0, 0, 0));
+            }
+        }
+
+        // --- Inicialización Principal ---
+
+        window.onload = function () {
+            // 1. Inicializar el tema y renderizar componentes estáticos
+            updateDOMTheme();
+            
+            // 2. Renderizar componentes dinámicos iniciales
+            renderModuleButtons();
+            renderWellnessDashboard();
+            renderEducationalCards();
+            
+            // 3. Inicializar Three.js para la interactividad 3D
+            initThreeJS();
+
+            // 4. Configurar listeners de UI
+            document.getElementById('toggle-dark-mode').onclick = toggleDarkMode;
+            document.getElementById('scroll-to-habitat').onclick = scrollToHabitat;
+        };
+
+    </script>
+    <!-- ==================================================================== -->
+    <!-- ======================= FIN PARTE 3: JAVASCRIPT LOGIC ====================== -->
+    <!-- ==================================================================== -->
+
+</body>
+</html><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Living in Space: Hábitat Futurista</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+
+    <!-- ==================================================================== -->
+    <!-- =========================== PARTE 1: CSS STYLES ========================== -->
+    <!-- ==================================================================== -->
+    <style>
+        /* Definición de fuentes */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap');
+       
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .font-inter { font-family: 'Inter', sans-serif; }
+
+
+        /* Variables de Color (para Dashboard y Three.js glow) */
+        :root {
+          --color-cyan: #06b6d4;
+          --color-blue: #3b82f6;
+          --color-yellow: #facc15;
+          --color-purple: #9333ea;
+          --color-red: #ef4444;
+          --star-color: rgba(255, 255, 255, 0.8);
+          --nebula-color: #00ffff;
+        }
+
+
+        /* Fondo espacial animado (CSS PURE) */
+        .space-background {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: #000;
+          background-image:
+            radial-gradient(1px 1px at 50% 50%, var(--star-color), rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 10% 90%, var(--nebula-color), rgba(0,0,0,0)),
+            radial-gradient(2px 2px at 90% 10%, var(--nebula-color), rgba(0,0,0,0));
+          background-size: 5000px 5000px, 3000px 3000px, 4000px 4000px;
+          animation: background-move 120s linear infinite;
+          opacity: 0.8;
+          z-index: -10;
+        }
+
+
+        @keyframes background-move {
+          0% { background-position: 0 0, 0 0, 0 0; }
+          100% { background-position: 5000px 5000px, -3000px 3000px, 4000px -4000px; }
+        }
+
+
+        /* Efecto Holograma/Glow para títulos */
+        .hologram-effect {
+            text-shadow: 0 0 5px var(--color-cyan), 0 0 10px var(--color-cyan);
+            animation: pulse 5s infinite alternate;
+        }
+
+
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+
+        /* Estilo para Three.js canvas */
+        #habitat-canvas {
+            min-height: 50vh;
+            display: block;
+            width: 100%;
+        }
+
+
+        /* Estilos de transición para el panel lateral */
+        .module-panel {
+            transition: transform 0.5s ease-in-out;
+        }
+
+
+        /* Dark Mode overrides (handled mostly by JS/Tailwind classes but setting defaults) */
+        body {
+            background-color: #111827; /* bg-gray-900 */
+            color: white;
+        }
+    </style>
+    <!-- ==================================================================== -->
+    <!-- ========================= FIN PARTE 1: CSS STYLES ======================== -->
+    <!-- ==================================================================== -->
+
+
+</head>
+<body>
+
+
+    <!-- ==================================================================== -->
+    <!-- ======================== PARTE 2: HTML STRUCTURE ======================= -->
+    <!-- ==================================================================== -->
+   
+    <div id="app" class="min-h-screen relative">
+
+
+        <!-- Fondo espacial -->
+        <div class="space-background"></div>
+
+
+        <!-- Botón de Modo Oscuro/Claro -->
+        <button id="toggle-dark-mode" class="fixed top-4 right-4 z-50 p-2 rounded-full text-2xl transition bg-gray-800 hover:bg-gray-700 text-cyan-400 hover:scale-110 shadow-lg" aria-label="Toggle Dark/Light Mode">
+            🌞
+        </button>
+
+
+        <!-- 1. Hero Section -->
+        <section class="h-screen flex flex-col items-center justify-center text-center p-6 relative z-10">
+            <h1 class="text-6xl md:text-8xl font-orbitron font-bold mb-4 text-cyan-400 tracking-tight hologram-effect">
+                Hogares en el Espacio
+            </h1>
+            <h2 class="text-2xl md:text-4xl font-light mb-6 text-white">
+                Viviendo más allá de la Tierra
+            </h2>
+            <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 text-white opacity-90">
+                Explora cómo la NASA diseña hábitats que mantienen a la tripulación sana, segura y lista para la misión.
+            </p>
+            <button id="scroll-to-habitat" class="py-3 px-8 text-xl rounded-full uppercase font-semibold transition transform hover:scale-105 bg-cyan-600 hover:bg-cyan-500 text-white shadow-xl shadow-cyan-500/50 border border-cyan-400/50">
+                Explorar el Hábitat
+            </button>
+        </section>
+
+
+        <!-- 2. Interactive 3D Habitat Map -->
+        <section id="habitat" class="py-16 md:py-24 p-6 relative z-10">
+            <h2 class="text-4xl md:text-5xl font-orbitron font-bold text-center mb-10 text-cyan-400 hologram-effect">
+                Mapa Interactivo del Hábitat
+            </h2>
+            <p class="text-center text-xl max-w-3xl mx-auto mb-12 opacity-80">
+                Haz clic o toca un módulo para ver cómo contribuye al bienestar de la tripulación.
+            </p>
+
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+                <!-- Columna de Botones (Renderizada por JS) -->
+                <div id="module-buttons" class="lg:col-span-1 flex flex-wrap lg:flex-col gap-4 lg:gap-3 justify-center lg:justify-start">
+                    <!-- Botones de Módulos van aquí -->
+                </div>
+
+
+                <!-- Columna de Visualización 3D -->
+                <div id="habitat-canvas-container" class="lg:col-span-3 h-[60vh] md:h-[70vh] rounded-xl overflow-hidden border border-cyan-500/30 shadow-2xl shadow-cyan-500/50 relative">
+                    <!-- El canvas de Three.js se inyecta aquí -->
+                </div>
+            </div>
+        </section>
+
+
+        <!-- 3. Panel de Bienestar de la Tripulación (Renderizado por JS) -->
+        <section class="py-16 md:py-24 p-6 relative z-10">
+            <div id="wellness-dashboard">
+                <!-- Dashboard va aquí -->
+            </div>
+        </section>
+
+
+        <!-- 4. Sección Educativa “Por qué es importante” (Renderizada por JS) -->
+        <section class="py-16 md:py-24 p-6 relative z-10">
+            <h2 class="text-4xl md:text-5xl font-orbitron font-bold text-center mb-10 text-cyan-400 hologram-effect">
+              Tecnología Clave
+            </h2>
+            <div id="educational-cards-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+                <!-- Tarjetas educativas van aquí -->
+            </div>
+        </section>
+
+
+        <!-- 5. Footer -->
+        <footer class="py-12 p-6 text-center border-t border-cyan-500/30 relative overflow-hidden bg-gray-800/70 backdrop-blur-sm">
+            <!-- Animación de planeta en órbita (fondo suave) -->
+            <div class="absolute inset-0 z-0 opacity-20">
+                <div class="w-40 h-40 bg-orange-800 rounded-full blur-xl absolute -bottom-10 -left-10 animate-[spin_60s_linear_infinite]"></div>
+                <div class="w-20 h-20 bg-cyan-800 rounded-full blur-lg absolute -top-5 -right-5 animate-[pulse_10s_ease-in-out_infinite]"></div>
+            </div>
+            <div class="relative z-10">
+                <p class="text-xl font-bold mb-3">
+                  Creado para el <span class="text-cyan-400">NASA Space Apps Challenge</span> – Proyecto Techno Titans
+                </p>
+                <p class="text-sm opacity-70 mb-6">Inspirando a la próxima generación de exploradores.</p>
+                <div class="flex justify-center space-x-6 text-2xl">
+                  <a href="https://github.com/nasa" target="_blank" rel="noopener noreferrer" class="hover:text-cyan-400 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 3c.48.97.48 2.41 0 3.37v.34l-1 .09c-2.84 0-5.17 2.37-5.17 5.27v.08a2.03 2.03 0 0 0 .58 1.48L11 17l.03-.01c.26-.06.52-.08.78-.08s.52.02.78.08l.03.01L14 17l.58-1.59a2.03 2.03 0 0 0 .58-1.48v-.08c0-2.9-2.33-5.27-5.17-5.27h-1l-1.09-.09v-.34c0-2.43 1.72-4.44 3.99-4.88A5.44 5.44 0 0 0 16 1.77a5.07 5.07 0 0 0 .91-1.77c-.48-.97-.48-2.41 0-3.37z"/></svg>
+                  </a>
+                  <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" class="hover:text-cyan-400 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 0-6 6v7H6v-7a6 6 0 0 1 12 0v7h-4V14a2 2 0 0 0-2-2H8V8h2a4 4 0 0 0 4 4h0a4 4 0 0 0 4-4z"/><circle cx="4" cy="4" r="2"/></svg>
+                  </a>
+                  <a href="https://www.nasa.gov" target="_blank" rel="noopener noreferrer" class="hover:text-orange-400 transition">
+                    <span class="font-orbitron font-bold">NASA</span>
+                  </a>
+                </div>
+            </div>
+        </footer>
+
+
+        <!-- Panel lateral de información (Renderizado por JS) -->
+        <div id="module-panel" class="module-panel fixed top-0 right-0 h-full w-full md:w-96 p-6 z-50 translate-x-full bg-gray-800/70 backdrop-blur-sm border-l border-cyan-500/30 shadow-2xl shadow-cyan-500/50 overflow-y-auto">
+            <!-- Contenido del módulo seleccionado va aquí -->
+        </div>
+
+
+    </div>
+
+
+    <!-- ==================================================================== -->
+    <!-- ======================= FIN PARTE 2: HTML STRUCTURE ====================== -->
+    <!-- ==================================================================== -->
+
+
+
+
+    <!-- ==================================================================== -->
+    <!-- ========================= PARTE 3: JAVASCRIPT LOGIC ======================== -->
+    <!-- ==================================================================== -->
+    <script>
+        // --- JAVASCRIPT: Lógica, Datos y Three.js ---
+
+
+        // --- Estado de la Aplicación ---
+        let selectedModuleId = null;
+        let exploredModules = new Set();
+        let isDarkMode = true;
+
+
+        // --- Datos y Contenido ---
+       
+        // ===================================================================================
+        // === AQUÍ ES DONDE TUS COMPAÑEROS DEBEN PEGAR LAS IMÁGENES Y AÑADIR MÁS DETALLES ===
+        // ===================================================================================
+        const MODULES_DATA = [
+          {
+            id: 'lifeSupport',
+            icon: '🌱',
+            name: 'Soporte Vital',
+            description: 'El sistema ECLSS (Control Ambiental) regula la atmósfera, recicla agua y genera oxígeno puro, esencial para la supervivencia en misiones de larga duración. Reciclaje del 93% del agua.',
+            longDescription: 'El subsistema de purificación de agua utiliza destilación y catálisis. El aire es filtrado para remover dióxido de carbono y contaminantes, manteniendo un ambiente respirable y seguro a largo plazo.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x00ffff,
+            link: 'https://www.nasa.gov/general/environmental-control-and-life-support-system-eclss/',
+            imageUrl: 'https://placehold.co/400x200/06b6d4/ffffff?text=Imagen+de+Soporte+Vital' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          {
+            id: 'wasteMgmt',
+            icon: '♻️',
+            name: 'Gestión de Residuos',
+            description: 'Los residuos son compactados y procesados. Conceptos como "Trash-to-Gas" buscan convertir los desechos orgánicos en recursos útiles, cerrando el ciclo de vida en el hábitat.',
+            longDescription: 'La incineración o gasificación de residuos puede generar energía y, lo más importante, recuperar agua, que es un recurso crítico. El reciclaje debe ser eficiente debido a las limitaciones de volumen.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x00ff00,
+            link: 'https://www.nasa.gov/general/trash-to-gas-technology-for-space-exploration/',
+            imageUrl: 'https://placehold.co/400x200/00ff00/000000?text=Imagen+de+Gestión+de+Residuos' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          {
+            id: 'thermalCtrl',
+            icon: '❄️',
+            name: 'Control Térmico',
+            description: 'Utiliza radiadores y loops de refrigeración para disipar el calor generado por la electrónica y los astronautas, manteniendo la temperatura interna estable y habitable.',
+            longDescription: 'El lado del hábitat que mira al sol se calienta mucho, mientras que el lado opuesto es extremadamente frío. Los sistemas térmicos deben equilibrar estas fluctuaciones extremas de temperatura.', // NUEVA INFORMACIÓN EXTRA
+            color: 0xffa500,
+            link: 'https://www.nasa.gov/mission/international-space-station/research-and-technology/thermal-control/',
+            imageUrl: 'https://placehold.co/400x200/ffa500/000000?text=Imagen+de+Control+Térmico' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          {
+            id: 'galley',
+            icon: '🍲',
+            name: 'Alimentos y Galley',
+            description: 'La cocina espacial (Galley) almacena y prepara alimentos liofilizados, nutricionalmente balanceados. La clave es la variedad y el aporte calórico adecuado para el trabajo.',
+            longDescription: 'Los alimentos deben tener una vida útil muy larga y ser fáciles de preparar, a menudo solo agregando agua. Los envases son diseñados para prevenir que la comida flote en microgravedad.', // NUEVA INFORMACIÓN EXTRA
+            color: 0xffff00,
+            link: 'https://www.nasa.gov/general/food-in-space/',
+            imageUrl: 'https://placehold.co/400x200/ffff00/000000?text=Imagen+de+Galley' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          {
+            id: 'medicalBay',
+            icon: '🏥',
+            name: 'Enfermería',
+            description: 'Un área dedicada al monitoreo de salud, telemedicina y el manejo de emergencias médicas. Es vital para asegurar que la tripulación permanezca en óptimas condiciones.',
+            longDescription: 'En misiones profundas, el tiempo de comunicación con la Tierra es demasiado largo. La tripulación debe ser capaz de realizar diagnósticos y procedimientos quirúrgicos de emergencia por sí misma.', // NUEVA INFORMACIÓN EXTRA
+            color: 0xff0000,
+            link: 'https://www.nasa.gov/missions/artemis/human-health/',
+            imageUrl: 'https://placehold.co/400x200/ff0000/ffffff?text=Imagen+de+Enfermería' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          {
+            id: 'sleep',
+            icon: '🛏️',
+            name: 'Cabinas de Descanso',
+            description: 'Módulos de sueño privados, diseñados para minimizar el ruido y controlar la luz, permitiendo un descanso de calidad esencial para la función cognitiva y el bienestar emocional.',
+            longDescription: 'Los astronautas duermen en sacos de dormir fijados a la pared para evitar flotar. El ruido de las bombas y ventiladores debe ser mitigado para garantizar 8 horas de sueño efectivas.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x0000ff,
+            link: 'https://www.nasa.gov/general/sleeping-in-space/',
+            imageUrl: 'https://placehold.co/400x200/0000ff/ffffff?text=Imagen+de+Descanso' // PEGAR URL DE IMAGEN AQUÍ
+          },
+          {
+            id: 'exercise',
+            icon: '🏋️',
+            name: 'Gimnasio',
+            description: 'Máquinas especializadas (ARED, CEVIS, T2) combaten la pérdida de masa muscular y ósea causada por la microgravedad, asegurando que los astronautas puedan regresar a la Tierra sanos.',
+            longDescription: 'La máquina ARED (Advanced Resistive Exercise Device) permite levantar peso en microgravedad, simulando la carga de la gravedad terrestre para los ejercicios de fuerza.', // NUEVA INFORMACIÓN EXTRA
+            color: 0x8a2be2,
+            link: 'https://www.nasa.gov/missions/station/research-and-technology/exercise/',
+            imageUrl: 'https://placehold.co/400x200/8a2be2/ffffff?text=Imagen+de+Gimnasio' // PEGAR URL DE IMAGEN AQUÍ
+          },
+        ];
+        // ===================================================================================
+        // === FIN DE LA SECCIÓN DE EDICIÓN DE IMÁGENES Y DETALLES ===========================
+        // ===================================================================================
+
+
+        const EDUCATIONAL_CARDS = [
+            { title: 'Recuperación de Agua', text: 'La ISS recicla hasta el 98% del agua total de la estación (incluyendo sudor, humedad y orina).', nasaLink: 'https://www.nasa.gov/missions/station/research-and-technology/water-recovery/' },
+            { title: 'Sistemas ECLSS', text: 'El sistema ECLSS es crucial, utilizando electrólisis para separar el agua en oxígeno respirable y hidrógeno.', nasaLink: 'https://www.nasa.gov/general/environmental-control-and-life-support-system-eclss/' },
+            { title: 'Ejercicio Obligatorio', text: 'Los astronautas deben realizar hasta 2.5 horas de ejercicio diario para contrarrestar la atrofia muscular y la desmineralización ósea.', nasaLink: 'https://www.nasa.gov/missions/station/research-and-technology/exercise/' },
+            { title: 'Bienestar Mental', text: 'El diseño interior busca minimizar la sensación de aislamiento: uso de colores cálidos, ventanas y áreas de recreación social.', nasaLink: 'https://www.nasa.gov/general/human-health-and-performance/' },
+        ];
+
+
+        const WELLNESS_DATA = [
+            { label: 'Oxígeno', value: 98, color: 'cyan' },
+            { label: 'Agua', value: 93, color: 'blue' },
+            { label: 'Nutrientes', value: 85, color: 'yellow' },
+            { label: 'Sueño (Hrs)', value: 8, color: 'purple' },
+            { label: 'Ejercicio (%)', value: 100, color: 'red' },
+        ];
+
+
+        // --- Configuración de Tema (Vanilla JS version) ---
+        const getThemeClasses = (isDark) => isDark ? {
+            bg: 'bg-gray-900',
+            text: 'text-white',
+            accent: 'text-cyan-400',
+            primary: 'bg-cyan-600 hover:bg-cyan-500',
+            secondary: 'bg-gray-800 hover:bg-gray-700',
+            card: 'bg-gray-800/70 backdrop-blur-sm',
+            shadow: 'shadow-cyan-500/50',
+            border: 'border-cyan-500/20'
+        } : {
+            bg: 'bg-gray-100',
+            text: 'text-gray-900',
+            accent: 'text-orange-600',
+            primary: 'bg-orange-600 hover:bg-orange-500',
+            secondary: 'bg-white hover:bg-gray-200',
+            card: 'bg-white/90 backdrop-blur-sm',
+            shadow: 'shadow-orange-500/50',
+            border: 'border-orange-500/20'
+        };
+       
+        let theme = getThemeClasses(isDarkMode);
+
+
+        // --- Funciones de Renderizado DOM ---
+
+
+        function updateDOMTheme() {
+            theme = getThemeClasses(isDarkMode);
+            const body = document.body;
+            body.className = `font-inter ${theme.bg} ${theme.text}`;
+           
+            // Actualizar el botón de modo oscuro/claro
+            const toggleBtn = document.getElementById('toggle-dark-mode');
+            toggleBtn.className = `fixed top-4 right-4 z-50 p-2 rounded-full text-2xl transition ${theme.secondary} ${theme.accent} hover:scale-110 shadow-lg`;
+            toggleBtn.textContent = isDarkMode ? '🌞' : '🌑';
+           
+            // Vuelve a renderizar componentes dinámicos para aplicar las nuevas clases de tema
+            renderModuleButtons();
+            renderWellnessDashboard();
+            renderEducationalCards();
+            updateModulePanel();
+        }
+
+
+        function renderModuleButtons() {
+            const container = document.getElementById('module-buttons');
+            container.innerHTML = '';
+            const allExplored = exploredModules.size === MODULES_DATA.length;
+
+
+            MODULES_DATA.forEach(module => {
+                const isSelected = selectedModuleId === module.id;
+                const isExplored = exploredModules.has(module.id);
+
+
+                const button = document.createElement('button');
+                button.setAttribute('data-module-id', module.id);
+                button.className = `w-full py-3 px-4 rounded-lg text-left transition duration-300 transform
+                    ${isSelected ? `border-2 border-orange-400/80 ${theme.card} shadow-xl shadow-orange-500/30` : `border ${theme.border} ${theme.secondary} opacity-70 hover:opacity-100 hover:scale-[1.02]`}
+                    flex items-center space-x-3`;
+                button.innerHTML = `
+                    <span class="text-2xl">${module.icon}</span>
+                    <span class="font-semibold">${module.name}</span>
+                    ${isExplored ? '<span class="text-orange-400 ml-auto text-xl">✓</span>' : ''}
+                `;
+                button.onclick = () => handleModuleClick(module.id);
+                container.appendChild(button);
+            });
+
+
+            if (allExplored) {
+                const message = document.createElement('div');
+                message.className = 'w-full mt-6 p-4 text-center rounded-lg bg-green-900/50 border border-green-500 text-green-400 font-bold text-lg animate-pulse';
+                message.textContent = '¡Felicidades! ¡Sabes cómo sobrevivir!';
+                container.appendChild(message);
+            }
+        }
+
+
+        function renderWellnessDashboard() {
+            const container = document.getElementById('wellness-dashboard');
+            container.innerHTML = `
+                <h2 class="text-4xl md:text-5xl font-extrabold text-center mb-10 ${theme.accent}">
+                    Panel de Bienestar de la Tripulación
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-6">
+                    ${WELLNESS_DATA.map((item, index) => `
+                        <div class="${theme.card} p-4 rounded-lg border ${theme.border} shadow-lg transition hover:scale-[1.03] duration-300">
+                            <p class="text-lg font-light mb-2 ${theme.text}">${item.label}</p>
+                            <div class="h-4 bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                    class="h-full rounded-full transition-all duration-1000 ease-out"
+                                    style="width: ${item.value}%; background-color: var(--color-${item.color}); box-shadow: 0 0 10px var(--color-${item.color});"
+                                ></div>
+                            </div>
+                            <p class="text-3xl font-bold mt-2 ${theme.accent}">${item.value}${item.label.includes('Hrs') ? '' : '%'}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+
+        function renderEducationalCards() {
+            const container = document.getElementById('educational-cards-container');
+            container.innerHTML = EDUCATIONAL_CARDS.map((card, index) => `
+                <div class="${theme.card} p-6 rounded-xl border ${theme.border} shadow-xl transition-all duration-500 hover:scale-[1.05] hover:border-orange-400/50">
+                    <h3 class="text-2xl font-bold mb-3 ${theme.accent} font-orbitron">${card.title}</h3>
+                    <p class="mb-6 ${theme.text} opacity-80">${card.text}</p>
+                    <a
+                        href="${card.nasaLink}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-block py-2 px-4 rounded-md text-sm font-semibold transition ${theme.primary} text-white"
+                    >
+                        Ver más en NASA
+                    </a>
+                </div>
+            `).join('');
+        }
+
+
+        function updateModulePanel() {
+            const panel = document.getElementById('module-panel');
+            const selectedModule = MODULES_DATA.find(m => m.id === selectedModuleId);
+
+
+            if (selectedModule) {
+                panel.classList.remove('translate-x-full');
+                panel.classList.add('translate-x-0');
+               
+                panel.innerHTML = `
+                    <button
+                        onclick="handleModuleClick(null)"
+                        class="fixed top-4 right-4 p-2 rounded-full ${theme.secondary} text-xl ${theme.accent} hover:scale-110 transition z-50"
+                    >
+                        &times;
+                    </button>
+                    <div class="flex flex-col h-full pt-10">
+                      <p class="text-6xl mb-4">${selectedModule.icon}</p>
+                      <h2 class="text-4xl font-bold mb-4 ${theme.accent}">${selectedModule.name}</h2>
+                     
+                      <!-- Contenedor de la Imagen del Módulo -->
+                      ${selectedModule.imageUrl ?
+                        `<img
+                            src="${selectedModule.imageUrl}"
+                            onerror="this.onerror=null;this.src='https://placehold.co/400x200/3b82f6/ffffff?text=Error+de+Carga';"
+                            alt="Imagen de ${selectedModule.name}"
+                            class="w-full h-auto rounded-lg mb-4 object-cover border border-white/20 shadow-lg"
+                        />` : ''}
+
+
+                      <p class="text-lg mb-4 ${theme.text} opacity-80">${selectedModule.description}</p>
+
+
+                      <!-- Campo de Información Adicional (Long Description) -->
+                      <div class="p-4 rounded-lg bg-gray-700/50 border border-cyan-400/30 mb-6 text-sm">
+                          <h3 class="font-bold text-cyan-400 mb-2 font-orbitron">Detalles Clave de la Tecnología:</h3>
+                          <p class="text-white opacity-90">${selectedModule.longDescription}</p>
+                      </div>
+
+
+                      <a
+                        href="${selectedModule.link}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="w-full text-center py-3 rounded-lg font-semibold uppercase tracking-wider transition ${theme.primary} text-white mt-auto shadow-md"
+                      >
+                        Ver más en NASA
+                      </a>
+                    </div>
+                `;
+            } else {
+                panel.classList.remove('translate-x-0');
+                panel.classList.add('translate-x-full');
+            }
+        }
+
+
+        // --- Manejadores de Eventos ---
+
+
+        function handleModuleClick(id) {
+            selectedModuleId = id;
+            if (id) {
+                exploredModules.add(id);
+                // Si la escena 3D está cargada, enfocar el módulo
+                if (window.animateThreeJS) {
+                    focusCameraOnModule(id);
+                }
+            } else {
+                // Volver a posición inicial de la cámara
+                if (window.animateThreeJS) {
+                    resetCameraPosition();
+                }
+            }
+            renderModuleButtons();
+            updateModulePanel();
+        }
+
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            updateDOMTheme();
+        }
+
+
+        function scrollToHabitat() {
+            document.getElementById('habitat').scrollIntoView({ behavior: 'smooth' });
+        }
+
+
+
+
+        // --- THREE.JS: Inicialización y Lógica 3D ---
+
+
+        let scene, camera, renderer, meshes = {};
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+
+        const getModuleConfig = (id) => {
+            switch (id) {
+              case 'lifeSupport': return { position: new THREE.Vector3(0, 3, 0), geometry: new THREE.CylinderGeometry(0.8, 0.8, 1.5, 32), name: 'lifeSupport' };
+              case 'wasteMgmt': return { position: new THREE.Vector3(2.5, 0, 0), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'wasteMgmt' };
+              case 'thermalCtrl': return { position: new THREE.Vector3(-2.5, 0, 0), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'thermalCtrl' };
+              case 'galley': return { position: new THREE.Vector3(0, 0, 2.5), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'galley' };
+              case 'medicalBay': return { position: new THREE.Vector3(0, 0, -2.5), geometry: new THREE.BoxGeometry(1.5, 1.5, 1.5), name: 'medicalBay' };
+              case 'sleep': return { position: new THREE.Vector3(1.5, 1.5, 1.5), geometry: new THREE.BoxGeometry(1, 1, 1), name: 'sleep' };
+              case 'exercise': return { position: new THREE.Vector3(-1.5, 1.5, -1.5), geometry: new THREE.BoxGeometry(1, 1, 1), name: 'exercise' };
+              default: return null;
+            }
+        };
+
+
+        function initThreeJS() {
+            const container = document.getElementById('habitat-canvas-container');
+            if (!container) return;
+
+
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.z = 10;
+
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // alpha: true para fondo transparente
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+           
+            const canvas = renderer.domElement;
+            canvas.id = 'habitat-canvas';
+            container.appendChild(canvas);
+
+
+            // Luces
+            scene.add(new THREE.AmbientLight(0x404040, 5));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 3);
+            dirLight.position.set(10, 10, 10);
+            scene.add(dirLight);
+
+
+            // Núcleo del Hábitat
+            const coreGeometry = new THREE.CylinderGeometry(1.5, 1.5, 5, 32);
+            const coreMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.4 });
+            const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial);
+            scene.add(coreMesh);
+
+
+            // Creación de Módulos
+            MODULES_DATA.forEach(moduleData => {
+              const config = getModuleConfig(moduleData.id);
+              const material = new THREE.MeshStandardMaterial({
+                color: moduleData.color,
+                emissive: moduleData.color,
+                emissiveIntensity: 0.2,
+                metalness: 0.9,
+                roughness: 0.2
+              });
+
+
+              const mesh = new THREE.Mesh(config.geometry, material);
+              mesh.position.copy(config.position);
+              mesh.userData.moduleData = moduleData;
+              meshes[moduleData.id] = mesh;
+              scene.add(mesh);
+            });
+
+
+            // Event Listeners para interacción 3D
+            canvas.addEventListener('pointerdown', onPointerDown, false);
+            container.addEventListener('mousemove', onMouseMove, false);
+            window.addEventListener('resize', onWindowResize, false);
+
+
+            animateThreeJS(); // Iniciar el bucle de animación
+        }
+       
+        // Exponer la función de animación para usarla en el onload (aunque ya está en initThreeJS)
+        window.animateThreeJS = function () {
+            requestAnimationFrame(window.animateThreeJS);
+
+
+            // Rotación suave
+            if (scene) {
+                scene.rotation.y += 0.001;
+            }
+           
+            // Renderizado
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        };
+
+
+
+
+        function onWindowResize() {
+            const container = document.getElementById('habitat-canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+
+            if (camera && renderer) {
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            }
+        }
+
+
+        function onPointerDown(event) {
+            event.preventDefault();
+
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(Object.values(meshes));
+
+
+            if (intersects.length > 0) {
+                const selectedMesh = intersects[0].object;
+                const moduleData = selectedMesh.userData.moduleData;
+
+
+                if (moduleData) {
+                    handleModuleClick(moduleData.id); // Actualiza el estado y el panel
+                }
+            } else {
+                handleModuleClick(null); // Click fuera, cerrar panel
+            }
+        }
+       
+        function onMouseMove(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(Object.values(meshes));
+
+
+            let hoveredModule = null;
+
+
+            Object.values(meshes).forEach(mesh => {
+                const moduleData = mesh.userData.moduleData;
+                const isSelected = selectedModuleId === moduleData.id;
+
+
+                if (intersects.length > 0 && intersects[0].object === mesh) {
+                    // Objeto en hover: Aumentar glow
+                    mesh.material.emissiveIntensity = 1.0;
+                    hoveredModule = moduleData.id;
+                    document.body.style.cursor = 'pointer';
+                } else if (isSelected) {
+                    // Objeto seleccionado: mantener glow
+                    mesh.material.emissiveIntensity = 0.8;
+                } else {
+                    // Normal: glow base
+                    mesh.material.emissiveIntensity = 0.2;
+                }
+            });
+
+
+            if (!hoveredModule) {
+                document.body.style.cursor = 'default';
+            }
+        }
+
+
+        function focusCameraOnModule(id) {
+            const selectedMesh = meshes[id];
+            if (selectedMesh && camera) {
+                // Zoom y centrado de la cámara hacia el módulo
+                const targetPosition = selectedMesh.position.clone().multiplyScalar(1.5);
+                camera.position.set(targetPosition.x, targetPosition.y + 2, targetPosition.z + 5);
+                camera.lookAt(selectedMesh.position);
+            }
+        }
+
+
+        function resetCameraPosition() {
+            if (camera) {
+                const targetPosition = new THREE.Vector3(0, 0, 10);
+                camera.position.set(targetPosition.x, targetPosition.y, targetPosition.z);
+                camera.lookAt(new THREE.Vector3(0, 0, 0));
+            }
+        }
+
+
+        // --- Inicialización Principal ---
+
+
+        window.onload = function () {
+            // 1. Inicializar el tema y renderizar componentes estáticos
+            updateDOMTheme();
+           
+            // 2. Renderizar componentes dinámicos iniciales
+            renderModuleButtons();
+            renderWellnessDashboard();
+            renderEducationalCards();
+           
+            // 3. Inicializar Three.js para la interactividad 3D
+            initThreeJS();
+
+
+            // 4. Configurar listeners de UI
+            document.getElementById('toggle-dark-mode').onclick = toggleDarkMode;
+            document.getElementById('scroll-to-habitat').onclick = scrollToHabitat;
+        };
+
+
+    </script>
+    <!-- ==================================================================== -->
+    <!-- ======================= FIN PARTE 3: JAVASCRIPT LOGIC ====================== -->
+    <!-- ==================================================================== -->
+
+
+</body>
+</html>
+
